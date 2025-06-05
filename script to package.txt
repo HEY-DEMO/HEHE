@@ -1,55 +1,62 @@
 param (
-    [string]$projectDir = ".",
-    [string]$configFileName = "app.config"  # Change to "web.config" if needed
+    [string]$solutionRoot = ".",
+    [string]$configFileName = "app.config"  # or "web.config"
 )
 
-# Load packages.config
-$packagesPath = Join-Path $projectDir "packages.config"
-if (!(Test-Path $packagesPath)) {
-    Write-Error "packages.config not found in $projectDir"
+# Find all packages.config files recursively
+$packagesFiles = Get-ChildItem -Path $solutionRoot -Recurse -Filter "packages.config"
+
+if ($packagesFiles.Count -eq 0) {
+    Write-Error "No packages.config files found."
     exit 1
 }
 
-# Load XML and create lookup table of package versions
-[xml]$packagesXml = Get-Content $packagesPath
-$packageVersions = @{}
-foreach ($pkg in $packagesXml.packages.package) {
-    $packageVersions[$pkg.id] = $pkg.version
-}
+foreach ($pkgFile in $packagesFiles) {
+    $projectDir = $pkgFile.Directory.FullName
+    $configPath = Join-Path $projectDir $configFileName
 
-# Load app.config or web.config
-$configPath = Join-Path $projectDir $configFileName
-if (!(Test-Path $configPath)) {
-    Write-Error "$configFileName not found in $projectDir"
-    exit 1
-}
+    if (!(Test-Path $configPath)) {
+        Write-Warning "$configFileName not found in $projectDir - skipping."
+        continue
+    }
 
-[xml]$configXml = Get-Content $configPath
-$namespaceManager = New-Object System.Xml.XmlNamespaceManager($configXml.NameTable)
-$namespaceManager.AddNamespace("asm", "urn:schemas-microsoft-com:asm.v1")
+    # Load package versions
+    [xml]$packagesXml = Get-Content $pkgFile.FullName
+    $packageVersions = @{}
+    foreach ($pkg in $packagesXml.packages.package) {
+        $packageVersions[$pkg.id] = $pkg.version
+    }
 
-# Find all bindingRedirect nodes
-$bindingRedirects = $configXml.SelectNodes("//asm:assemblyBinding/asm:dependentAssembly", $namespaceManager)
+    # Load config XML
+    [xml]$configXml = Get-Content $configPath
+    $namespaceManager = New-Object System.Xml.XmlNamespaceManager($configXml.NameTable)
+    $namespaceManager.AddNamespace("asm", "urn:schemas-microsoft-com:asm.v1")
 
-foreach ($binding in $bindingRedirects) {
-    $assemblyName = $binding.assemblyIdentity.name
-    $redirectNode = $binding.bindingRedirect
+    # Update binding redirects
+    $bindingRedirects = $configXml.SelectNodes("//asm:assemblyBinding/asm:dependentAssembly", $namespaceManager)
+    $changesMade = $false
 
-    if ($packageVersions.ContainsKey($assemblyName)) {
-        $newVersion = $packageVersions[$assemblyName]
-        $oldVersion = $redirectNode.oldVersion
-        $redirectNode.newVersion = $newVersion
-        $redirectNode.oldVersion = "0.0.0.0-$newVersion"
-        Write-Host "Updated $assemblyName binding redirect to version $newVersion"
+    foreach ($binding in $bindingRedirects) {
+        $assemblyName = $binding.assemblyIdentity.name
+        $redirectNode = $binding.bindingRedirect
+
+        if ($packageVersions.ContainsKey($assemblyName)) {
+            $newVersion = $packageVersions[$assemblyName]
+            $oldVersion = $redirectNode.oldVersion
+            $redirectNode.newVersion = $newVersion
+            $redirectNode.oldVersion = "0.0.0.0-$newVersion"
+            Write-Host "[$configFileName] $assemblyName => $newVersion"
+            $changesMade = $true
+        }
+    }
+
+    if ($changesMade) {
+        $configXml.Save($configPath)
+        Write-Host "Updated: $configPath"
+    } else {
+        Write-Host "No changes needed in: $configPath"
     }
 }
-
-
-
-# Save updated config file
-$configXml.Save($configPath)
-Write-Host "$configFileName updated successfully."
-
 
 -----------------------------------------------------------------------------------------------------
 
