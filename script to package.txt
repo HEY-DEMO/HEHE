@@ -1,0 +1,72 @@
+param (
+    [string]$projectDir = ".",
+    [string]$configFileName = "app.config"  # Change to "web.config" if needed
+)
+
+# Load packages.config
+$packagesPath = Join-Path $projectDir "packages.config"
+if (!(Test-Path $packagesPath)) {
+    Write-Error "packages.config not found in $projectDir"
+    exit 1
+}
+
+# Load XML and create lookup table of package versions
+[xml]$packagesXml = Get-Content $packagesPath
+$packageVersions = @{}
+foreach ($pkg in $packagesXml.packages.package) {
+    $packageVersions[$pkg.id] = $pkg.version
+}
+
+# Load app.config or web.config
+$configPath = Join-Path $projectDir $configFileName
+if (!(Test-Path $configPath)) {
+    Write-Error "$configFileName not found in $projectDir"
+    exit 1
+}
+
+[xml]$configXml = Get-Content $configPath
+$namespaceManager = New-Object System.Xml.XmlNamespaceManager($configXml.NameTable)
+$namespaceManager.AddNamespace("asm", "urn:schemas-microsoft-com:asm.v1")
+
+# Find all bindingRedirect nodes
+$bindingRedirects = $configXml.SelectNodes("//asm:assemblyBinding/asm:dependentAssembly", $namespaceManager)
+
+foreach ($binding in $bindingRedirects) {
+    $assemblyName = $binding.assemblyIdentity.name
+    $redirectNode = $binding.bindingRedirect
+
+    if ($packageVersions.ContainsKey($assemblyName)) {
+        $newVersion = $packageVersions[$assemblyName]
+        $oldVersion = $redirectNode.oldVersion
+        $redirectNode.newVersion = $newVersion
+        $redirectNode.oldVersion = "0.0.0.0-$newVersion"
+        Write-Host "Updated $assemblyName binding redirect to version $newVersion"
+    }
+}
+
+
+
+# Save updated config file
+$configXml.Save($configPath)
+Write-Host "$configFileName updated successfully."
+
+
+-----------------------------------------------------------------------------------------------------
+
+ How to Use
+Save this script as Update-BindingRedirect.ps1
+
+Open PowerShell and run:
+
+
+
+.\Update-BindingRedirect.ps1 -projectDir "C:\Path\To\Your\Project" -configFileName "app.config"
+
+
+🧠 Notes:
+It assumes the assembly name in packages.config matches what's in assemblyIdentity name.
+
+It updates oldVersion to cover any lower version (0.0.0.0-newVersion), which is common for redirects.
+
+Make a backup of your config file before running, especially in large solutions.
+
