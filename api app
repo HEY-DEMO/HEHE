@@ -1,0 +1,84 @@
+using System;
+using System.Collections.Generic;
+using System.Windows.Forms;
+
+namespace ApiCheckerApp
+{
+    public partial class MainForm : Form
+    {
+        private CheckBox env1HeaderCheckBox = new CheckBox();
+        private CheckBox env2HeaderCheckBox = new CheckBox();
+        private CheckBox env3HeaderCheckBox = new CheckBox();
+        private string[] apis = { "Login API", "User API", "Payment API", "Order API", "Product API", "Report API", "Notification API" };
+
+        public MainForm()
+        {
+            InitializeComponent();
+            InitializeTable();
+        }
+
+        private void InitializeTable()
+        {
+            dataGridView1.ColumnCount = 1;
+            dataGridView1.Columns[0].Name = "API";
+            dataGridView1.Columns[0].ReadOnly = true;
+
+            AddCheckboxColumn("Dev", env1HeaderCheckBox);
+            AddCheckboxColumn("QA", env2HeaderCheckBox);
+            AddCheckboxColumn("Prod", env3HeaderCheckBox);
+
+            foreach (var api in apis)
+            {
+                dataGridView1.Rows.Add(api, false, false, false);
+            }
+
+            // Adjust headers
+            AddHeaderCheckbox(env1HeaderCheckBox, 1);
+            AddHeaderCheckbox(env2HeaderCheckBox, 2);
+            AddHeaderCheckbox(env3HeaderCheckBox, 3);
+        }
+
+        private void AddCheckboxColumn(string header, CheckBox headerCheckbox)
+        {
+            var col = new DataGridViewCheckBoxColumn();
+            col.HeaderText = header;
+            dataGridView1.Columns.Add(col);
+        }
+
+        private void AddHeaderCheckbox(CheckBox checkbox, int columnIndex)
+        {
+            Rectangle rect = dataGridView1.GetCellDisplayRectangle(columnIndex, -1, true);
+            checkbox.Size = new System.Drawing.Size(15, 15);
+            checkbox.Location = new System.Drawing.Point(rect.Location.X + 20, rect.Location.Y + 5);
+            checkbox.CheckedChanged += (s, e) => SetAllCheckboxesInColumn(columnIndex, checkbox.Checked);
+            dataGridView1.Controls.Add(checkbox);
+        }
+
+        private void SetAllCheckboxesInColumn(int columnIndex, bool value)
+        {
+            foreach (DataGridViewRow row in dataGridView1.Rows)
+            {
+                row.Cells[columnIndex].Value = value;
+            }
+        }
+
+        private void btnRun_Click(object sender, EventArgs e)
+        {
+            string result = "Selected APIs:\n";
+            foreach (DataGridViewRow row in dataGridView1.Rows)
+            {
+                string api = row.Cells[0].Value.ToString();
+                bool dev = Convert.ToBoolean(row.Cells[1].Value);
+                bool qa = Convert.ToBoolean(row.Cells[2].Value);
+                bool prod = Convert.ToBoolean(row.Cells[3].Value);
+
+                if (dev || qa || prod)
+                {
+                    result += $"{api} - Dev: {dev}, QA: {qa}, Prod: {prod}\n";
+                }
+            }
+
+            MessageBox.Show(result, "Run Info");
+        }
+    }
+}
