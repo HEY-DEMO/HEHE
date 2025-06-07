@@ -1,19 +1,22 @@
 using System;
-using System.Collections.Generic;
 using System.Windows.Forms;
 
 namespace ApiCheckerApp
 {
-    public partial class MainForm : Form
+    public partial class Form1 : Form
     {
-        private CheckBox env1HeaderCheckBox = new CheckBox();
-        private CheckBox env2HeaderCheckBox = new CheckBox();
-        private CheckBox env3HeaderCheckBox = new CheckBox();
+        private CheckBox devHeaderCheckbox = new CheckBox();
+        private CheckBox qaHeaderCheckbox = new CheckBox();
+        private CheckBox prodHeaderCheckbox = new CheckBox();
         private string[] apis = { "Login API", "User API", "Payment API", "Order API", "Product API", "Report API", "Notification API" };
 
-        public MainForm()
+        public Form1()
         {
             InitializeComponent();
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
             InitializeTable();
         }
 
@@ -23,42 +26,42 @@ namespace ApiCheckerApp
             dataGridView1.Columns[0].Name = "API";
             dataGridView1.Columns[0].ReadOnly = true;
 
-            AddCheckboxColumn("Dev", env1HeaderCheckBox);
-            AddCheckboxColumn("QA", env2HeaderCheckBox);
-            AddCheckboxColumn("Prod", env3HeaderCheckBox);
+            AddCheckboxColumn("Dev", devHeaderCheckbox);
+            AddCheckboxColumn("QA", qaHeaderCheckbox);
+            AddCheckboxColumn("Prod", prodHeaderCheckbox);
 
             foreach (var api in apis)
             {
                 dataGridView1.Rows.Add(api, false, false, false);
             }
 
-            // Adjust headers
-            AddHeaderCheckbox(env1HeaderCheckBox, 1);
-            AddHeaderCheckbox(env2HeaderCheckBox, 2);
-            AddHeaderCheckbox(env3HeaderCheckBox, 3);
+            AddHeaderCheckbox(devHeaderCheckbox, 1);
+            AddHeaderCheckbox(qaHeaderCheckbox, 2);
+            AddHeaderCheckbox(prodHeaderCheckbox, 3);
         }
 
         private void AddCheckboxColumn(string header, CheckBox headerCheckbox)
         {
             var col = new DataGridViewCheckBoxColumn();
             col.HeaderText = header;
+            col.Width = 60;
             dataGridView1.Columns.Add(col);
         }
 
         private void AddHeaderCheckbox(CheckBox checkbox, int columnIndex)
         {
-            Rectangle rect = dataGridView1.GetCellDisplayRectangle(columnIndex, -1, true);
+            var rect = dataGridView1.GetCellDisplayRectangle(columnIndex, -1, true);
             checkbox.Size = new System.Drawing.Size(15, 15);
-            checkbox.Location = new System.Drawing.Point(rect.Location.X + 20, rect.Location.Y + 5);
-            checkbox.CheckedChanged += (s, e) => SetAllCheckboxesInColumn(columnIndex, checkbox.Checked);
+            checkbox.Location = new System.Drawing.Point(rect.Location.X + 25, rect.Location.Y + 4);
+            checkbox.CheckedChanged += (s, e) => SetColumnCheckboxes(columnIndex, checkbox.Checked);
             dataGridView1.Controls.Add(checkbox);
         }
 
-        private void SetAllCheckboxesInColumn(int columnIndex, bool value)
+        private void SetColumnCheckboxes(int columnIndex, bool isChecked)
         {
             foreach (DataGridViewRow row in dataGridView1.Rows)
             {
-                row.Cells[columnIndex].Value = value;
+                row.Cells[columnIndex].Value = isChecked;
             }
         }
 
@@ -74,11 +77,11 @@ namespace ApiCheckerApp
 
                 if (dev || qa || prod)
                 {
-                    result += $"{api} - Dev: {dev}, QA: {qa}, Prod: {prod}\n";
+                    result += $"{api} => Dev: {dev}, QA: {qa}, Prod: {prod}\n";
                 }
             }
 
-            MessageBox.Show(result, "Run Info");
+            MessageBox.Show(result, "Run Summary");
         }
     }
 }
